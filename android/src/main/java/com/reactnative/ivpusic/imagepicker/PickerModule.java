@@ -26,6 +26,7 @@ import com.facebook.react.bridge.PromiseImpl;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
+import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.WritableNativeMap;
@@ -66,6 +67,8 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
     private static final String E_ERROR_WHILE_CLEANING_FILES = "E_ERROR_WHILE_CLEANING_FILES";
 
     private String mediaType = "any";
+    private ReadableArray extraMimeTypes;
+
     private boolean multiple = false;
     private boolean includeBase64 = false;
     private boolean includeExif = false;
@@ -116,6 +119,7 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
 
     private void setConfiguration(final ReadableMap options) {
         mediaType = options.hasKey("mediaType") ? options.getString("mediaType") : mediaType;
+        extraMimeTypes = options.hasKey("extraMimeTypes") ? options.getArray("extraMimeTypes") : extraMimeTypes;
         multiple = options.hasKey("multiple") && options.getBoolean("multiple");
         includeBase64 = options.hasKey("includeBase64") && options.getBoolean("includeBase64");
         includeExif = options.hasKey("includeExif") && options.getBoolean("includeExif");
@@ -337,8 +341,19 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
                 galleryIntent.setType("video/*");
             } else {
                 galleryIntent.setType("*/*");
-                String[] mimetypes = {"image/*", "video/*"};
-                galleryIntent.putExtra(Intent.EXTRA_MIME_TYPES, mimetypes);
+
+                ArrayList<String> mimeTypes = new ArrayList<>();
+                mimeTypes.add("image/*");
+                mimeTypes.add("video/*");
+
+                // Allow selection extra mime types through extraMimeTypes
+                if (extraMimeTypes != null) {
+                    for (int i = 0; i < extraMimeTypes.size(); i++) {
+                        mimeTypes.add(extraMimeTypes.getString(i));
+                    }
+                }
+
+                galleryIntent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes.toArray(new String[0]));
             }
 
             galleryIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
@@ -455,9 +470,20 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
         }
 
         String mime = getMimeType(path);
-        if (mime != null && mime.startsWith("video/")) {
-            getVideo(activity, path, mime);
-            return;
+        if (mime != null) {
+            if (mime.startsWith("video/")) {
+                getVideo(activity, path, mime);
+                return;
+            }
+
+            if (!mime.startsWith("image/") && extraMimeTypes != null) {
+                for (int i = 0; i < extraMimeTypes.size(); i++) {
+                    if (mime.equals(extraMimeTypes.getString(i))) {
+                        getFile(activity, path, mime);
+                        return;
+                    }
+                }
+            }
         }
 
         resultCollector.notifySuccess(getImage(activity, path));
@@ -513,6 +539,20 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
                 }));
             }
         }).run();
+    }
+
+    private void getFile(final Activity activity, final String path, final String mime) throws Exception {
+        File handle = new File(path);
+
+        WritableMap file = new WritableNativeMap();
+        file.putInt("width", 0);
+        file.putInt("height", 0);
+        file.putString("mime", mime);
+        file.putInt("size", (int) handle.length());
+        file.putString("path", "file://" + path);
+        file.putString("modificationDate", String.valueOf(handle.lastModified()));
+
+        resultCollector.notifySuccess(file);
     }
 
     private String resolveRealPath(Activity activity, Uri uri, boolean isCamera) throws IOException {
