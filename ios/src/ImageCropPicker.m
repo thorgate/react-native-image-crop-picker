@@ -90,7 +90,7 @@ RCT_EXPORT_MODULE();
                                 @"mediaType": @"any",
                                 @"showsSelectedCount": @YES,
                                 @"cropperCancelText": @"Cancel",
-                                @"cropperChooseText": @"Choose"
+                                @"cropperChooseText": @"Choose",
                                 };
         self.compression = [[Compression alloc] init];
     }
@@ -190,6 +190,15 @@ RCT_EXPORT_METHOD(openCamera:(NSDictionary *)options
             if ([availableTypes containsObject:(NSString *)kUTTypeMovie]) {
                 [types addObject:(NSString *) kUTTypeMovie];
                 picker.videoQuality = UIImagePickerControllerQualityTypeHigh;
+            }
+
+            NSArray *extraMimeTypes = [self.options objectForKey:@"extraMimeTypes"];
+            if (extraMimeTypes != nil) {
+                for (NSString* mimetype in extraMimeTypes) {
+                    if ([mimetype isEqualToString:@"application/pdf"]) {
+                        [types addObject:(NSString *) kUTTypePDF];
+                    }
+                }
             }
 
             picker.mediaTypes = [types copy];
