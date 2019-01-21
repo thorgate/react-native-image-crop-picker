@@ -184,7 +184,28 @@ RCT_EXPORT_METHOD(openCamera:(NSDictionary *)options
                 picker.mediaTypes = [[NSArray alloc] initWithObjects:(NSString *)kUTTypeMovie, nil];
                 picker.videoQuality = UIImagePickerControllerQualityTypeHigh;
             }
-        }
+        } else if ([mediaType isEqualToString:@"any"]) {
+            NSArray *availableTypes = [UIImagePickerController availableMediaTypesForSourceType:UIImagePickerControllerSourceTypeCamera];
+
+            NSMutableArray* types = [NSMutableArray array];
+            [types addObject:(NSString *) kUTTypeImage];
+
+            if ([availableTypes containsObject:(NSString *)kUTTypeMovie]) {
+                [types addObject:(NSString *) kUTTypeMovie];
+                picker.videoQuality = UIImagePickerControllerQualityTypeHigh;
+            }
+
+            NSArray *extraMimeTypes = [self.options objectForKey:@"extraMimeTypes"];
+            if (extraMimeTypes != nil) {
+                for (NSString* mimetype in extraMimeTypes) {
+                    if ([mimetype isEqualToString:@"application/pdf"]) {
+                        [types addObject:(NSString *) kUTTypePDF];
+                    }
+                }
+            }
+
+            picker.mediaTypes = [types copy];
+         }
 
         if ([[self.options objectForKey:@"useFrontCamera"] boolValue]) {
             picker.cameraDevice = UIImagePickerControllerCameraDeviceFront;
